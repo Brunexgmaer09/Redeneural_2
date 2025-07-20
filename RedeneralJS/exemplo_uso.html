@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exemplo de Uso - Rede Neural JS</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .output {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 Rede Neural JavaScript</h1>
+        <p>Exemplo de uso da rede neural convertida do C++</p>
+        
+        <div>
+            <button onclick="testarRedeNeural()">Testar Rede Neural</button>
+            <button onclick="testarTreinamento()">Testar Treinamento</button>
+            <button onclick="testarAlgoritmoGenetico()">Testar Algoritmo Genético</button>
+            <button onclick="limparOutput()">Limpar</button>
+        </div>
+        
+        <div id="output" class="output">Clique nos botões acima para testar a rede neural...</div>
+    </div>
+
+    <!-- Incluir os arquivos da rede neural -->
+    <script src="FuncoesAuxiliares.js"></script>
+    <script src="RedeNeural.js"></script>
+    <script src="AlgoritmoGenetico.js"></script>
+
+    <script>
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function limparOutput() {
+            document.getElementById('output').innerHTML = '';
+        }
+
+        function testarRedeNeural() {
+            try {
+                log("=== TESTE BÁSICO DA REDE NEURAL ===");
+                
+                // Criar uma rede simples: 2 entradas, 1 camada escondida com 4 neurônios, 1 saída
+                const rede = new RedeNeural(1, 2, 4, 1);
+                log("✓ Rede neural criada com sucesso", 'success');
+                log(`  - Entradas: 2, Escondidas: 4, Saídas: 1`);
+                log(`  - Total de pesos: ${rede.getQuantidadePesos()}`);
+                
+                // Testar com dados de entrada
+                const entrada = [0.5, -0.3];
+                rede.copiarParaEntrada(entrada);
+                rede.calcularSaida();
+                
+                const saida = rede.copiarDaSaida();
+                log(`✓ Entrada: [${entrada.join(', ')}]`);
+                log(`✓ Saída: [${saida.map(x => x.toFixed(4)).join(', ')}]`, 'success');
+                
+                // Testar salvamento/carregamento
+                const dadosSalvos = rede.salvarRede('teste_rede');
+                log("✓ Rede salva com sucesso");
+                
+                const redeCarregada = RedeNeural.carregarRede(dadosSalvos);
+                redeCarregada.copiarParaEntrada(entrada);
+                redeCarregada.calcularSaida();
+                const saidaCarregada = redeCarregada.copiarDaSaida();
+                
+                log(`✓ Rede carregada - Saída: [${saidaCarregada.map(x => x.toFixed(4)).join(', ')}]`);
+                
+                // Verificar se as saídas são iguais
+                const iguais = saida.every((val, i) => Math.abs(val - saidaCarregada[i]) < 0.0001);
+                log(iguais ? "✓ Salvamento/carregamento funcionando!" : "✗ Erro no salvamento/carregamento", 
+                    iguais ? 'success' : 'error');
+                
+            } catch (error) {
+                log(`✗ Erro: ${error.message}`, 'error');
+            }
+        }
+
+        function testarTreinamento() {
+            try {
+                log("=== TESTE DE TREINAMENTO (XOR) ===");
+                
+                // Criar rede para aprender XOR
+                const rede = new RedeNeural(1, 2, 4, 1);
+                log("✓ Rede criada para aprender XOR", 'success');
+                
+                // Dados de treinamento XOR
+                const dadosTreinamento = [
+                    { entrada: [0, 0], saida: [0] },
+                    { entrada: [0, 1], saida: [1] },
+                    { entrada: [1, 0], saida: [1] },
+                    { entrada: [1, 1], saida: [0] }
+                ];
+                
+                log("Treinando rede...");
+                
+                // Treinar por algumas épocas
+                for (let epoca = 0; epoca < 1000; epoca++) {
+                    for (const dado of dadosTreinamento) {
+                        rede.treinar(dado.entrada, dado.saida);
+                    }
+                    
+                    // Mostrar progresso a cada 200 épocas
+                    if (epoca % 200 === 0) {
+                        let erroTotal = 0;
+                        for (const dado of dadosTreinamento) {
+                            rede.copiarParaEntrada(dado.entrada);
+                            rede.calcularSaida();
+                            erroTotal += rede.calcularErroQuadratico(dado.saida);
+                        }
+                        log(`  Época ${epoca}: Erro = ${erroTotal.toFixed(6)}`);
+                    }
+                }
+                
+                log("✓ Treinamento concluído!", 'success');
+                
+                // Testar a rede treinada
+                log("Testando rede treinada:");
+                for (const dado of dadosTreinamento) {
+                    rede.copiarParaEntrada(dado.entrada);
+                    rede.calcularSaida();
+                    const saida = rede.copiarDaSaida();
+                    const esperado = dado.saida[0];
+                    const obtido = saida[0];
+                    
+                    log(`  [${dado.entrada.join(',')}] → ${obtido.toFixed(4)} (esperado: ${esperado})`);
+                }
+                
+            } catch (error) {
+                log(`✗ Erro: ${error.message}`, 'error');
+            }
+        }
+
+        function testarAlgoritmoGenetico() {
+            try {
+                log("=== TESTE ALGORITMO GENÉTICO ===");
+                
+                // Criar algoritmo genético
+                const ag = new AlgoritmoGenetico(50, 1, 2, 4, 1); // População de 50
+                log("✓ Algoritmo genético criado", 'success');
+                log(`  - População: ${ag.getTamanhoPopulacao()}`);
+                log(`  - Taxa de mutação: ${ag.getTaxaMutacao()}`);
+                
+                // Inicializar população
+                ag.inicializarPopulacao();
+                log("✓ População inicializada");
+                
+                // Função de avaliação simples (quanto mais próximo de 0.5, melhor)
+                function avaliarRede(rede) {
+                    rede.copiarParaEntrada([0.5, 0.5]);
+                    rede.calcularSaida();
+                    const saida = rede.copiarDaSaida();
+                    return 1.0 - Math.abs(0.5 - saida[0]); // Fitness maior = melhor
+                }
+                
+                // Evoluir por algumas gerações
+                for (let geracao = 0; geracao < 10; geracao++) {
+                    ag.avaliarPopulacao(avaliarRede);
+                    
+                    const melhorFitness = ag.getMelhorFitness();
+                    const mediaFitness = ag.getMediaFitness();
+                    
+                    log(`  Geração ${geracao}: Melhor=${melhorFitness.toFixed(4)}, Média=${mediaFitness.toFixed(4)}`);
+                    
+                    if (geracao < 9) ag.evoluir();
+                }
+                
+                log("✓ Evolução concluída!", 'success');
+                
+                // Testar o melhor indivíduo
+                let melhorIndividuo = ag.getIndividuo(0);
+                for (let i = 1; i < ag.getTamanhoPopulacao(); i++) {
+                    const individuo = ag.getIndividuo(i);
+                    if (individuo.fitness > melhorIndividuo.fitness) {
+                        melhorIndividuo = individuo;
+                    }
+                }
+                
+                melhorIndividuo.rede.copiarParaEntrada([0.5, 0.5]);
+                melhorIndividuo.rede.calcularSaida();
+                const saidaMelhor = melhorIndividuo.rede.copiarDaSaida();
+                
+                log(`✓ Melhor indivíduo: saída=${saidaMelhor[0].toFixed(4)} (fitness=${melhorIndividuo.fitness.toFixed(4)})`, 'success');
+                
+            } catch (error) {
+                log(`✗ Erro: ${error.message}`, 'error');
+            }
+        }
+
+        // Teste inicial automático
+        window.onload = function() {
+            log("🚀 Rede Neural JavaScript carregada!", 'success');
+            log("Clique nos botões para testar as funcionalidades.");
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualização da Rede Neural</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        canvas {
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            display: block;
+            margin: 20px auto;
+            background: #f8f9fa;
+        }
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .slider-container {
+            display: inline-block;
+            margin: 10px;
+            text-align: center;
+        }
+        .slider-container label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="range"] {
+            width: 150px;
+        }
+        .value-display {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .info-panel {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .output-values {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 10px 0;
+        }
+        .output-value {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 Visualização da Rede Neural</h1>
+        <p>Ajuste as entradas abaixo e veja como a rede neural processa os dados em tempo real.</p>
+        
+        <canvas id="redeCanvas" width="800" height="400"></canvas>
+        
+        <div class="controls">
+            <h3>Controles de Entrada</h3>
+            <div class="slider-container">
+                <label for="entrada1">Entrada 1</label>
+                <input type="range" id="entrada1" min="-1" max="1" step="0.1" value="0">
+                <div class="value-display" id="valor1">0.0</div>
+            </div>
+            <div class="slider-container">
+                <label for="entrada2">Entrada 2</label>
+                <input type="range" id="entrada2" min="-1" max="1" step="0.1" value="0">
+                <div class="value-display" id="valor2">0.0</div>
+            </div>
+            <div class="slider-container">
+                <label for="entrada3">Entrada 3</label>
+                <input type="range" id="entrada3" min="-1" max="1" step="0.1" value="0">
+                <div class="value-display" id="valor3">0.0</div>
+            </div>
+        </div>
+        
+        <div class="info-panel">
+            <h3>Saídas da Rede Neural</h3>
+            <div class="output-values" id="outputValues">
+                <div class="output-value">Saída 1: <span id="saida1">0.000</span></div>
+                <div class="output-value">Saída 2: <span id="saida2">0.000</span></div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button onclick="gerarNovaRede()">🔄 Gerar Nova Rede</button>
+            <button onclick="treinarXOR()">🎯 Treinar XOR</button>
+            <button onclick="animarEntradas()">🎬 Animação Demo</button>
+            <button onclick="exportarRede()">💾 Exportar Rede</button>
+        </div>
+        
+        <div class="info-panel">
+            <h3>Informações da Rede</h3>
+            <div id="infoRede">
+                <p><strong>Arquitetura:</strong> <span id="arquitetura">3 → 4 → 2</span></p>
+                <p><strong>Total de Pesos:</strong> <span id="totalPesos">22</span></p>
+                <p><strong>Status:</strong> <span id="statusRede">Inicializada</span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Incluir todos os arquivos da rede neural -->
+    <script src="FuncoesAuxiliares.js"></script>
+    <script src="RedeNeural.js"></script>
+    <script src="Variaveis.js"></script>
+    <script src="InputsRedeNeural.js"></script>
+    <script src="VisualizadorRede.js"></script>
+
+    <script>
+        // Variáveis globais
+        let rede;
+        let visualizador;
+        let animando = false;
+
+        // Inicialização
+        window.onload = function() {
+            const canvas = document.getElementById('redeCanvas');
+            visualizador = new VisualizadorRede(canvas);
+            
+            // Criar rede neural: 3 entradas, 1 camada escondida com 4 neurônios, 2 saídas
+            rede = new RedeNeural(1, 3, 4, 2);
+            
+            // Configurar eventos dos sliders
+            setupSliders();
+            
+            // Atualizar visualização inicial
+            atualizarVisualizacao();
+            
+            console.log('Visualização da rede neural carregada!');
+        };
+
+        function setupSliders() {
+            const sliders = ['entrada1', 'entrada2', 'entrada3'];
+            
+            sliders.forEach((id, index) => {
+                const slider = document.getElementById(id);
+                const valorDisplay = document.getElementById(`valor${index + 1}`);
+                
+                slider.addEventListener('input', function() {
+                    valorDisplay.textContent = parseFloat(this.value).toFixed(1);
+                    if (!animando) {
+                        atualizarVisualizacao();
+                    }
+                });
+            });
+        }
+
+        function obterEntradas() {
+            return [
+                parseFloat(document.getElementById('entrada1').value),
+                parseFloat(document.getElementById('entrada2').value),
+                parseFloat(document.getElementById('entrada3').value)
+            ];
+        }
+
+        function atualizarVisualizacao() {
+            const entradas = obterEntradas();
+            
+            // Processar entradas através da rede
+            rede.copiarParaEntrada(entradas);
+            rede.calcularSaida();
+            const saidas = rede.copiarDaSaida();
+            
+            // Atualizar visualização
+            visualizador.desenharRedeNeural(rede, entradas);
+            
+            // Atualizar displays das saídas
+            document.getElementById('saida1').textContent = saidas[0].toFixed(3);
+            document.getElementById('saida2').textContent = saidas[1].toFixed(3);
+            
+            // Atualizar informações da rede
+            atualizarInfo();
+        }
+
+        function atualizarInfo() {
+            const entradas = rede.getCamadaEntrada().getQuantidadeNeuronios();
+            const escondidas = rede.getCamadasEscondidas()[0].getQuantidadeNeuronios();
+            const saidas = rede.getCamadaSaida().getQuantidadeNeuronios();
+            
+            document.getElementById('arquitetura').textContent = `${entradas} → ${escondidas} → ${saidas}`;
+            document.getElementById('totalPesos').textContent = rede.getQuantidadePesos();
+        }
+
+        function gerarNovaRede() {
+            rede = new RedeNeural(1, 3, 4, 2);
+            atualizarVisualizacao();
+            document.getElementById('statusRede').textContent = 'Nova rede gerada';
+            console.log('Nova rede neural gerada!');
+        }
+
+        function treinarXOR() {
+            document.getElementById('statusRede').textContent = 'Treinando XOR...';
+            
+            // Criar rede específica para XOR (2 entradas, 1 saída)
+            const redeXOR = new RedeNeural(1, 2, 4, 1);
+            
+            // Dados de treinamento XOR
+            const dadosTreinamento = [
+                { entrada: [0, 0], saida: [0] },
+                { entrada: [0, 1], saida: [1] },
+                { entrada: [1, 0], saida: [1] },
+                { entrada: [1, 1], saida: [0] }
+            ];
+            
+            // Treinar por 1000 épocas
+            for (let epoca = 0; epoca < 1000; epoca++) {
+                for (const dado of dadosTreinamento) {
+                    redeXOR.treinar(dado.entrada, dado.saida);
+                }
+            }
+            
+            // Testar e mostrar resultados
+            console.log('Resultados do treinamento XOR:');
+            for (const dado of dadosTreinamento) {
+                redeXOR.copiarParaEntrada(dado.entrada);
+                redeXOR.calcularSaida();
+                const resultado = redeXOR.copiarDaSaida()[0];
+                console.log(`[${dado.entrada.join(',')}] → ${resultado.toFixed(4)} (esperado: ${dado.saida[0]})`);
+            }
+            
+            document.getElementById('statusRede').textContent = 'XOR treinado (veja console)';
+        }
+
+        function animarEntradas() {
+            if (animando) return;
+            
+            animando = true;
+            document.getElementById('statusRede').textContent = 'Animando...';
+            
+            let tempo = 0;
+            const duracao = 5000; // 5 segundos
+            const intervalo = 50; // 50ms
+            
+            const animacao = setInterval(() => {
+                tempo += intervalo;
+                const progresso = tempo / duracao;
+                
+                // Gerar valores senoidais para as entradas
+                const entrada1 = Math.sin(progresso * Math.PI * 4);
+                const entrada2 = Math.cos(progresso * Math.PI * 3);
+                const entrada3 = Math.sin(progresso * Math.PI * 2 + Math.PI/4);
+                
+                // Atualizar sliders
+                document.getElementById('entrada1').value = entrada1;
+                document.getElementById('entrada2').value = entrada2;
+                document.getElementById('entrada3').value = entrada3;
+                
+                // Atualizar displays
+                document.getElementById('valor1').textContent = entrada1.toFixed(1);
+                document.getElementById('valor2').textContent = entrada2.toFixed(1);
+                document.getElementById('valor3').textContent = entrada3.toFixed(1);
+                
+                // Atualizar visualização
+                atualizarVisualizacao();
+                
+                if (tempo >= duracao) {
+                    clearInterval(animacao);
+                    animando = false;
+                    document.getElementById('statusRede').textContent = 'Animação concluída';
+                }
+            }, intervalo);
+        }
+
+        function exportarRede() {
+            const dadosRede = rede.salvarRede('rede_exportada');
+            const dadosJson = JSON.stringify(dadosRede, null, 2);
+            
+            // Criar blob e download
+            const blob = new Blob([dadosJson], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'rede_neural.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            URL.revokeObjectURL(url);
+            
+            document.getElementById('statusRede').textContent = 'Rede exportada!';
+            console.log('Dados da rede:', dadosRede);
+        }
+
+        // Redimensionar canvas quando necessário
+        window.addEventListener('resize', function() {
+            // Opcional: redimensionar canvas responsivamente
+        });
+    </script>
+</body>
+</html>

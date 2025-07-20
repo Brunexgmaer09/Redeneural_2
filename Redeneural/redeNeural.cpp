@@ -1,6 +1,7 @@
 #include "RedeNeural.hpp"
 #include <cmath>
 #include <fstream>
+#include <stdexcept>
 
 RedeNeural::RedeNeural(int quantidadeEscondidas, 
                        int qtdNeuroniosEntrada, 
@@ -9,6 +10,11 @@ RedeNeural::RedeNeural(int quantidadeEscondidas,
     : camadaEntrada(qtdNeuroniosEntrada, 0),
       camadaSaida(qtdNeuroniosSaida, qtdNeuroniosEscondida)
 {
+    if(quantidadeEscondidas <= 0 || qtdNeuroniosEntrada <= 0 || 
+       qtdNeuroniosEscondida <= 0 || qtdNeuroniosSaida <= 0) {
+        throw std::invalid_argument("Quantidade de neurônios deve ser positiva");
+    }
+    
     // Inicializa camadas escondidas
     for(int i = 0; i < quantidadeEscondidas; i++) {
         int entradasCamada = (i == 0) ? qtdNeuroniosEntrada : qtdNeuroniosEscondida;
@@ -17,6 +23,10 @@ RedeNeural::RedeNeural(int quantidadeEscondidas,
 }
 
 void RedeNeural::calcularSaida() {
+    if(camadasEscondidas.empty()) {
+        throw std::runtime_error("Rede neural deve ter pelo menos uma camada escondida");
+    }
+    
     // Propaga valores da entrada para primeira camada escondida
     for(int i = 0; i < camadasEscondidas[0].getQuantidadeNeuronios(); i++) {
         double soma = 0;
@@ -198,4 +208,106 @@ void RedeNeural::salvarRede(const std::string& nomeArquivo) const {
     for(double peso : pesos) {
         arquivo.write(reinterpret_cast<const char*>(&peso), sizeof(double));
     }
+}
+
+void RedeNeural::treinar(const std::vector<double>& entrada, const std::vector<double>& saidaEsperada) {
+    copiarParaEntrada(entrada);
+    calcularSaida();
+    calcularErro(saidaEsperada);
+    backpropagation();
+}
+
+void RedeNeural::calcularErro(const std::vector<double>& saidaEsperada) {
+    if(saidaEsperada.size() != (size_t)camadaSaida.getQuantidadeNeuronios()) {
+        throw std::invalid_argument("Tamanho da saída esperada não coincide com saída da rede");
+    }
+    
+    // Calcular erro na camada de saída
+    for(int i = 0; i < camadaSaida.getQuantidadeNeuronios(); i++) {
+        double saida = camadaSaida.getNeuronio(i).getSaida();
+        double erro = saidaEsperada[i] - saida;
+        camadaSaida.getNeuronio(i).setErro(erro * derivadaSigmoid(saida));
+    }
+}
+
+void RedeNeural::backpropagation() {
+    // Propagação do erro da camada de saída para a última camada escondida
+    for(int i = 0; i < camadasEscondidas.back().getQuantidadeNeuronios(); i++) {
+        double erro = 0;
+        for(int j = 0; j < camadaSaida.getQuantidadeNeuronios(); j++) {
+            erro += camadaSaida.getNeuronio(j).getErro() * 
+                    camadaSaida.getNeuronio(j).getPeso(i);
+        }
+        double saida = camadasEscondidas.back().getNeuronio(i).getSaida();
+        camadasEscondidas.back().getNeuronio(i).setErro(erro * derivadaTanh(saida));
+    }
+    
+    // Propagação do erro entre camadas escondidas
+    for(int c = camadasEscondidas.size() - 2; c >= 0; c--) {
+        for(int i = 0; i < camadasEscondidas[c].getQuantidadeNeuronios(); i++) {
+            double erro = 0;
+            for(int j = 0; j < camadasEscondidas[c+1].getQuantidadeNeuronios(); j++) {
+                erro += camadasEscondidas[c+1].getNeuronio(j).getErro() * 
+                        camadasEscondidas[c+1].getNeuronio(j).getPeso(i);
+            }
+            double saida = camadasEscondidas[c].getNeuronio(i).getSaida();
+            camadasEscondidas[c].getNeuronio(i).setErro(erro * derivadaTanh(saida));
+        }
+    }
+    
+    // Atualização dos pesos da camada de saída
+    for(int i = 0; i < camadaSaida.getQuantidadeNeuronios(); i++) {
+        for(int j = 0; j < camadasEscondidas.back().getQuantidadeNeuronios(); j++) {
+            double deltaPeso = TAXA_APRENDIZADO * 
+                             camadaSaida.getNeuronio(i).getErro() * 
+                             camadasEscondidas.back().getNeuronio(j).getSaida();
+            double novoPeso = camadaSaida.getNeuronio(i).getPeso(j) + deltaPeso;
+            camadaSaida.getNeuronio(i).setPeso(j, novoPeso);
+        }
+    }
+    
+    // Atualização dos pesos entre camadas escondidas
+    for(size_t c = 1; c < camadasEscondidas.size(); c++) {
+        for(int i = 0; i < camadasEscondidas[c].getQuantidadeNeuronios(); i++) {
+            for(int j = 0; j < camadasEscondidas[c-1].getQuantidadeNeuronios(); j++) {
+                double deltaPeso = TAXA_APRENDIZADO * 
+                                 camadasEscondidas[c].getNeuronio(i).getErro() * 
+                                 camadasEscondidas[c-1].getNeuronio(j).getSaida();
+                double novoPeso = camadasEscondidas[c].getNeuronio(i).getPeso(j) + deltaPeso;
+                camadasEscondidas[c].getNeuronio(i).setPeso(j, novoPeso);
+            }
+        }
+    }
+    
+    // Atualização dos pesos da primeira camada escondida
+    for(int i = 0; i < camadasEscondidas[0].getQuantidadeNeuronios(); i++) {
+        for(int j = 0; j < camadaEntrada.getQuantidadeNeuronios(); j++) {
+            double deltaPeso = TAXA_APRENDIZADO * 
+                             camadasEscondidas[0].getNeuronio(i).getErro() * 
+                             camadaEntrada.getNeuronio(j).getSaida();
+            double novoPeso = camadasEscondidas[0].getNeuronio(i).getPeso(j) + deltaPeso;
+            camadasEscondidas[0].getNeuronio(i).setPeso(j, novoPeso);
+        }
+    }
+}
+
+double RedeNeural::calcularErroQuadratico(const std::vector<double>& saidaEsperada) {
+    if(saidaEsperada.size() != (size_t)camadaSaida.getQuantidadeNeuronios()) {
+        throw std::invalid_argument("Tamanho da saída esperada não coincide com saída da rede");
+    }
+    
+    double erroTotal = 0;
+    for(int i = 0; i < camadaSaida.getQuantidadeNeuronios(); i++) {
+        double diferenca = saidaEsperada[i] - camadaSaida.getNeuronio(i).getSaida();
+        erroTotal += diferenca * diferenca;
+    }
+    return erroTotal / 2.0;
+}
+
+double RedeNeural::derivadaTanh(double x) {
+    return 1.0 - (x * x);
+}
+
+double RedeNeural::derivadaSigmoid(double x) {
+    return x * (1.0 - x);
 }

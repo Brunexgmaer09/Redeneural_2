@@ -63,6 +63,14 @@ public:
     void copiarParaEntrada(const std::vector<double>& vetorEntrada);
     void copiarDaSaida(std::vector<double>& vetorSaida);
     
+    void treinar(const std::vector<double>& entrada, const std::vector<double>& saidaEsperada);
+    void calcularErro(const std::vector<double>& saidaEsperada);
+    void backpropagation();
+    double calcularErroQuadratico(const std::vector<double>& saidaEsperada);
+    
+    static double derivadaTanh(double x);
+    static double derivadaSigmoid(double x);
+    
     int getQuantidadePesos() const;
     void copiarVetorParaCamadas(const std::vector<double>& vetor);
     void copiarCamadasParaVetor(std::vector<double>& vetor) const;
